@@ -1,0 +1,218 @@
+'''
+Created on 2016. 1. 22.
+
+@author: beatific J
+'''
+from Queue import Queue
+from abc import abstractmethod
+import threading
+
+from util.pool import ThreadPool
+
+
+# from multiprocessing.pool import ThreadPool
+class Node(object):
+    
+    def __init__(self, type, config=None):
+        
+        self.root = False
+        self.parents = []
+        self.children = []
+        self.type = type
+        self.local = threading.local()
+        self.config = config
+        
+    def add_child(self, child):
+        if child is None : 
+            return
+        
+        self.children.append(child)
+        
+    def add_children(self, children):
+        
+        if children is None : 
+            return
+        
+        if not type(children) is list :
+            raise Exception('Node.add_children : Child of Node must be List. real [%s]' % type(children))
+        
+        self.children[len(self.children):] = children
+        
+    def clear_children(self):
+        self.children = []
+
+    def add_parent(self, parent):
+        
+        if parent is None : 
+            return
+        
+        self.parents.append(parent)
+        
+    def add_parents(self, parents):
+        if parents is None : 
+            return
+        
+        if type(parents) is not list :
+            raise Exception('Node.add_parents : parent of Node must be List. real [%s]' % type(parents))
+        
+        self.parents[len(self.parents):] = parents
+    
+    @abstractmethod
+    def inner_process(self, parent, params):
+        pass
+    
+    def process(self, parent=None, params=None):
+        
+        results = []
+        data = self.inner_process(parent, params)
+        for child in self.children:
+            results.append(child.process(self, data))
+        return self.convert(results)
+
+    def convert(self, results):
+        return results[0]
+    
+
+    @abstractmethod    
+    def inner_shutdown(self):
+        pass
+        
+    def stop(self):
+        self.inner_shutdown()
+        for child in self.children:
+            child.stop()
+
+class Root(Node):
+
+    def __init__(self, params=None):
+        Node.__init__(self, 'root')
+        self.root = True
+        self.leaf = False
+        
+    def inner_process(self, parent, params):
+        pass
+
+class Leaf(Node):
+    
+    def __init__(self, params=None):
+        Node.__init__(self, 'leaf')
+        self.root = False
+        self.leaf = True
+        
+    def process(self, parent, params):
+        return params
+
+class Receiver(Node):
+
+    def __init__(self, config, params=None):
+        Node.__init__(self, 'receiver', config)
+        
+        self._is_shut_down = threading.Event()
+        self._shutdown_request = False
+        
+        self.q = Queue() #using spped_test
+        self.q.put({'count':0, 't1':None, 't2':None}) #using speed_test 
+    
+    def inner_process(self, parent, params):
+        return self.receive(params)
+    
+    def start(self):
+        t = threading.Thread(target = self.serve_forever, args = ())
+        t.daemon = self.daemon_threads
+        t.start()
+        
+    def serve_forever(self):
+        self._is_shut_down.clear()
+        try:
+            while not self._shutdown_request:
+                self._handle_request_noblock()
+        finally:
+            self._shutdown_request = False
+            self._is_shut_down.set()
+            
+    def _handle_request_noblock(self):
+        
+        connection, data = self.get_connection()
+        if self.verify_request(connection, data):
+            try:
+                self.process_request(connection, data)
+            except:
+                self.handle_error(connection, data)
+                self.shutdown_request(connection)
+
+    def handle_error(self, connection, data):
+        print '-'*40
+        print 'Exception happened during processing of request',
+        import traceback
+        traceback.print_exc()
+        print '-'*40
+        
+    def shutdown(self):
+        self._shutdown_request = True
+        self._is_shut_down.wait()
+        
+    def verify_request(self, connection, data):
+        return True
+    
+    def process_request(self, connection, data):
+        self.finish_request(connection, data)
+        self.shutdown_request(connection, data)
+    
+    def finish_request(self, connection, data):
+        self.handle(connection, data, self)
+        
+    def shutdown_request(self, connection):
+        self.close_request(connection)
+        
+    def close_request(self, connection):
+        pass
+    
+    def server_activate(self):
+        pass
+    
+    @abstractmethod
+    def get_connection(self):
+        pass
+    
+    @abstractmethod
+    def handle(self, connection, data, server):
+        pass
+        
+    @abstractmethod
+    def receive(self, params):
+        pass
+
+class ThreadingMixIn:
+    
+    def __init__(self, config):
+        self.pool = ThreadPool(processes=int(config.config('threads')))
+    
+    def process_request_thread(self, request, client_address):
+        try:
+            self.finish_request(request, client_address)
+            self.shutdown_request(request)
+        except:
+            self.handle_error(request, client_address)
+            self.shutdown_request(request)
+
+    def process_request(self, request, client_address):
+        self.pool.apply_async(func=self.process_request_thread, args=(request, client_address))
+    
+class Sender(Node):
+
+    def __init__(self, config, params=None):
+        Node.__init__(self, 'sender', config)
+        
+    def inner_process(self, parent, params):
+        return self.send(params)
+        
+    @abstractmethod
+    def send(self, params):
+        pass
+    
+class Loopback(Node):
+    def __init__(self, config, params=None):
+        Node.__init__(self, 'loopback', config)
+    
+    def inner_process(self, parent, params):
+        pass

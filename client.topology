@@ -1,0 +1,2 @@
+[{'num': 1, 'root' : True, 'children':[2], 'class' : 'node.ThreadingQueueReceiver'}, 
+                {'num': 2, 'root' : False, 'children':[], 'class' : 'node.TCPSender'}]
