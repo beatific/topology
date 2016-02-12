@@ -43,7 +43,6 @@ def test():
     time.sleep(0.2)
     
 def main():
-    print 'main'
     p = ThreadPool(10)
     
     while True :

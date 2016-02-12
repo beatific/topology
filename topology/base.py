@@ -210,9 +210,27 @@ class Sender(Node):
     def send(self, params):
         pass
     
-class Loopback(Node):
+class Devider(Node):
     def __init__(self, config, params=None):
-        Node.__init__(self, 'loopback', config)
-    
+        Node.__init__(self, 'devider', config)
+
     def inner_process(self, parent, params):
+        return params
+    
+    def process(self, parent=None, params=None):
+        condition = self.condition(parent, params)
+        if condition:
+            return self.ifthen(condition, parent, params)
+        else :
+            return self.ifnot(parent, params)
+    
+    def ifthen(self, condition, parent, params):
+        return Node.process(self, parent, params)
+    
+    @abstractmethod 
+    def condition(self, parent, params):
+        pass
+    
+    @abstractmethod
+    def ifnot(self, parent, params):
         pass

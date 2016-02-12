@@ -22,7 +22,7 @@ def put_and_get():
     queue.put('message', sixk)
 #         time.sleep(0.02)
     data = queue.get('response')
-    print data
+#     print data
     queue.disconnect()
 
 if __name__ == "__main__":

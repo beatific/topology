@@ -10,11 +10,13 @@ import sys
 import threading
 import time
 
+from util.queue import QueueManager
+from util.tcp import Socket
+
+from base import Devider
 from base import Receiver
 from base import Sender
 from base import ThreadingMixIn
-from util.tcp import Socket
-from util.queue import QueueManager
 
 
 lock = threading.Lock()
@@ -36,22 +38,17 @@ def speed_test(func):
         
         with lock:
             arg = self.q.get()
-            if arg['count'] == 1000: 
-                arg['count'] = 0
+            if arg['count'] % 1000 == 0: 
                 arg['t2'] = time.time()
-                print '======================================%s took %0.3f ms======================================' % (func.func_name, (arg['t2']-arg['t1'])*1000.0)
-                print '====================================== %0.3f tps======================================' % (1000 / (arg['t2']-arg['t1']))
+                print '====================================== %0.3f tps======================================' % (arg['count'] / (arg['t2']-arg['t1']))
             self.q.put(arg)
             
         return results
     return wrapper
-
-
     
 class QueueReceiver(Receiver):
     
     daemon_threads = False
-    size = 10
 
     def __init__(self, config, params=None):
         Receiver.__init__(self, config, params)
@@ -64,7 +61,7 @@ class QueueReceiver(Receiver):
     def get_connection(self):
 #         data = self.queue().get('message')
 #         return self.queue(), data
-        return None
+        return (None, None)
     
     @speed_test
     def handle(self, queue, data, server):
@@ -100,14 +97,14 @@ class TCPReceiver(TCPServer, Receiver):
     @speed_test
     def handle(self, request, client_address, server):
         
-        print >>sys.stderr, 'receive message'
+#         print >>sys.stderr, 'receive message'
         self.local.message = self.receive_data(request)
-        print >>sys.stderr, 'server : received "%s"' % self.local.message
+#         print >>sys.stderr, 'server : received "%s"' % self.local.message
         
         response = self.process()
         
         request.sendall(response)
-        print >>sys.stderr, 'server : sent "%s"' % response
+#         print >>sys.stderr, 'server : sent "%s"' % response
     
     def start(self):
         t = threading.Thread(target = self.serve_forever, args = ())
@@ -124,7 +121,6 @@ class TCPReceiver(TCPServer, Receiver):
             received += str(data)
             
             if len(data) < size: 
-                print received
                 return received;    
             
     def receive(self, key=None):
@@ -138,8 +134,8 @@ class ThreadingTCPReceiver(ThreadingMixIn, TCPReceiver):
         
 class ThreadingQueueReceiver(ThreadingMixIn, QueueReceiver): 
     def __init__(self, config, params=None):
-        QueueReceiver.__init__(self, config, params)
         ThreadingMixIn.__init__(self, config)
+        QueueReceiver.__init__(self, config, params)
         
 class QueueSender(Sender):
 
@@ -169,10 +165,21 @@ class TCPSender(Sender):
         
         sock = Socket(self.ip, self.port)
         sock.connect()
-        print 'message %s' % message
         sock.send(message)
         data = sock.receive()
-        print 'data %s' % data
         sock.close()
         
         return data
+
+class Loopback(Devider):
+    def __init__(self, config, params=None):
+        Devider.__init__(self, config)
+        self.loopback_yn = bool(config.properties('loopback'))
+        self.loopback_message = config.properties('loopback_message')
+
+    def condition(self, parent, params):
+        return not self.loopback_yn
+    
+    def ifnot(self, parent, params):
+        return self.loopback_message
+        

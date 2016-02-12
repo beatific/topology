@@ -37,8 +37,7 @@ def speed_test(func):
         
         with lock:
             arg = self.q.get()
-            if arg['count'] == 1000: 
-                arg['count'] = 0
+            if arg['count'] % 1000 == 0: 
                 arg['t2'] = time.time()
                 print '======================================%s took %0.3f ms======================================' % (func.func_name, (arg['t2']-arg['t1'])*1000.0)
                 print '====================================== %0.3f tps======================================' % (1000 / (arg['t2']-arg['t1']))
@@ -95,8 +94,6 @@ class QueueManager(object):
         promise = self.local.queue.close()
         self.local.queue.wait(promise)
         
-        print 'disconnect'
-
 class PukaQueue(puka.Client):
     def _connect(self):
         self._handle_read = self._handle_conn_read
@@ -156,7 +153,6 @@ class Test(object):
             print ex
 
 def main():
-    print 'main'
     p = ThreadPool(10)
     test = Test()
     while True :

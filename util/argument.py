@@ -62,12 +62,12 @@ class ArgumentParser(object):
     
     def _exception(self):
         if self._usage:
-            print >>sys.stderr, self._usage
+            print >>sys.stderr, '[Usage]', self._usage
         else:
             print >>sys.stderr, 'not exists designated usage!'
         sys.exit(1)
     
-    def _validataion(self, dict):
+    def _validate(self, dict):
         
         # mandatory value
         if set(self._mandatories) - set(dict.keys()):
@@ -85,7 +85,7 @@ class ArgumentParser(object):
         
         dict = self._arguemnt_dict(self._args[1:])  
         if self._validation:
-            self._validataion(dict)
+            self._validate(dict)
             
         return dict
 

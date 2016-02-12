@@ -123,6 +123,7 @@ class TopologyBuilder(object):
 def main():
     parser = ArgumentParser(sys.argv)
     parser.mandatory = '--config'
+    parser.usage = 'topology.py --config <configfile>'
     map = parser.map
     config = Config(map['config'])
     

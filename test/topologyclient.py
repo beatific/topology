@@ -4,20 +4,26 @@ Created on 2016. 1. 13.
 @author: beatific J
 '''
 import unittest
-from topology.topology import Topology
-#from guppy.heapy import RM
 
+from topology.topology import Topology
+from util.argument import ArgumentParser
+from util.config import Config
+
+
+#from guppy.heapy import RM
 class Test(unittest.TestCase):
 
     def testTopology(self):
         
-        docs = [{'num': 1, 'root' : True, 'children':[2], 'class' : 'node.ThreadingQueueReceiver'}, 
-                {'num': 2, 'root' : False, 'children':[], 'class' : 'node.TCPSender'}]
+        args = ['topology.py', '--config', 'C:/Users/Administrator/git/topology/client.cfg']
         
-#         docs = [{'num': 1, 'root' : True, 'children':[2], 'class' : 'receiver.QueueReceiver'}, 
-#                 {'num': 2, 'root' : False, 'children':[], 'class' : 'sender.TCPSender'}]
-
-        Topology.start(docs)
+        parser = ArgumentParser(args)
+        parser.mandatory = '--config'
+        parser.usage = 'topology.py --config <configfile>'
+        map = parser.map
+        config = Config(map['config'])
+        
+        Topology.start(config)
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']
