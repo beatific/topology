@@ -6,11 +6,10 @@ Created on 2016. 1. 13.
 
 from Queue import Queue
 from SocketServer import TCPServer
-import sys
 import threading
 import time
 
-from sqlalchemy import Column, String, Boolean
+from sqlalchemy import Column, String
 from sqlalchemy.ext.declarative import declarative_base
 from util.queue import QueueManager
 from util.tcp import Socket
@@ -101,14 +100,11 @@ class TCPReceiver(TCPServer, Receiver):
     @speed_test
     def handle(self, request, client_address, server):
         
-#         print >>sys.stderr, 'receive message'
         self.local.message = self.receive_data(request)
-#         print >>sys.stderr, 'server : received "%s"' % self.local.message
         
         response = self.process()
         
         request.sendall(response)
-#         print >>sys.stderr, 'server : sent "%s"' % response
     
     def start(self):
         t = threading.Thread(target = self.serve_forever, args = ())
@@ -210,6 +206,10 @@ class Loopback(Devider):
     def condition(self, parent, params):
         self.info = self.database(self.id)
         return not self.info[0]
+    
+    def ifthen(self, condition, parent, params):
+        
+        return Devider.ifthen(self, condition, parent, params)
     
     def ifnot(self, parent, params):
         return self.info[1]

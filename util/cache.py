@@ -4,14 +4,13 @@ Created on 2016. 2. 16.
 @author: P067880
 '''
 import time
-import sys
 
 class Cache:
     
     cache = {}
     
 
-    def __init__(self, interval):
+    def __init__(self, interval=60):
         '''
             @param interval (unit / seconds)
         '''
@@ -48,7 +47,7 @@ class Cache:
         return result
 
 
-cache = Cache(60)
+cache = Cache()
 
 def cachable(func):
     def wrapper(*args, **kwargs):
