@@ -14,6 +14,7 @@ def test():
 def put_and_get(message):
     queue = QueueManager('localhost')
     queue.connect()
+    print 'message :', message
     queue.put('message', message)
     response = queue.get('response')
     print 'response message:', response

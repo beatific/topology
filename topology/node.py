@@ -10,6 +10,8 @@ import sys
 import threading
 import time
 
+from sqlalchemy import Column, String, Boolean
+from sqlalchemy.ext.declarative import declarative_base
 from util.queue import QueueManager
 from util.tcp import Socket
 
@@ -17,6 +19,8 @@ from base import Devider
 from base import Receiver
 from base import Sender
 from base import ThreadingMixIn
+from util.db import Datasource
+from util.cache import cachable
 
 
 lock = threading.Lock()
@@ -171,15 +175,42 @@ class TCPSender(Sender):
         
         return data
 
+Base = declarative_base()
+
+
+class LoopbackInfo(Base):
+    __tablename__ = 'TB_LOOPBACK'
+    id = Column(String(50), primary_key=True)
+    name = Column(String(100))
+    loopback_yn = Column(String(1))
+    loopback_message = Column(String(4000))
+
 class Loopback(Devider):
     def __init__(self, config, params=None):
         Devider.__init__(self, config)
-        self.loopback_yn = bool(config.properties('loopback'))
-        self.loopback_message = config.properties('loopback_message')
+        self.db = Datasource(config.properties('db_address'))
+        self.id = config.properties('id')
+    
+    @cachable
+    def database(self, id):
+        loopback_yn = False
+        loopback_message = ''
+         
+        for  info in self.db.query(LoopbackInfo).filter("id='%s'" % id):
+            if info.loopback_yn == 'Y':
+                loopback_yn = True
+            else :
+                loopback_yn = False
+                
+            loopback_message = info.loopback_message
+            break
+        
+        return loopback_yn, loopback_message
 
     def condition(self, parent, params):
-        return not self.loopback_yn
+        self.info = self.database(self.id)
+        return not self.info[0]
     
     def ifnot(self, parent, params):
-        return self.loopback_message
+        return self.info[1]
         
