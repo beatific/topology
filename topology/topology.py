@@ -6,12 +6,14 @@ Created on 2016. 1. 11.
 
 import sys
 
+from util.argument import ArgumentParser
+from util.config import Config
+
 from base import Leaf
 from base import Root
 from exception import ExceptionHandler
 import node
-from util.config import Config
-from util.argument import ArgumentParser
+from util.db import Datasource
 
 
 class Topology(object):
@@ -43,8 +45,14 @@ class TopologyBuilder(object):
 
     numberingObjects = {}
     
+    @staticmethod
+    def configDatasource(config):
+        Datasource.config(config.properties('db_address'), int(config.properties('db_pool_size')))
+    
     @staticmethod    
     def prebuild(config):
+        
+        TopologyBuilder.configDatasource(config)
         
         if not type(config) is Config :
             raise Exception('TpologyBuilder.prebuild: config must be Config type. real [%s]' % type(config))

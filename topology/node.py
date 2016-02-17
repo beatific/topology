@@ -9,7 +9,7 @@ from SocketServer import TCPServer
 import threading
 import time
 
-from sqlalchemy import Column, String
+from sqlalchemy import Column, String, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from util.queue import QueueManager
 from util.tcp import Socket
@@ -57,6 +57,7 @@ class QueueReceiver(Receiver):
         Receiver.__init__(self, config, params)
         self.request_queue_name = config.config('request_queue')
         self.response_queue_name = config.config('response_queue')
+        self.queue_address = config.config('queue_address')
         self.q = Queue() #using speed_test
         self.q.put({'count':0, 't1':None, 't2':None}) #using speed_test
         self.start()
@@ -69,12 +70,13 @@ class QueueReceiver(Receiver):
     @speed_test
     def handle(self, queue, data, server):
         
-        queue = QueueManager('localhost')
+        queue = QueueManager(self.queue_address)
         queue.connect()
         data = queue.get(self.request_queue_name)
         self.local.message = data
         
         response = self.process()
+        
         queue.put(self.response_queue_name, response)
         
         queue.disconnect()
@@ -143,10 +145,10 @@ class QueueSender(Sender):
         Sender.__init__(self, config, params)
         self.request_queue_name = config.config('request_queue')
         self.response_queue_name = config.config('response_queue')
-        
+        self.queue_address = config.config('queue_address')
         
     def send(self, message):
-        queue = QueueManager('localhost')
+        queue = QueueManager(self.queue_address)
         queue.connect()
         queue.put(self.request_queue_name, message)
         data = queue.get(self.response_queue_name)
@@ -181,14 +183,31 @@ class LoopbackInfo(Base):
     loopback_yn = Column(String(1))
     loopback_message = Column(String(4000))
 
+from sqlalchemy import Sequence
+
+class LoopbackResult(Base):
+    __tablename__ = 'TB_LOOPBACK_RESULT'
+    seq = Column(Integer, Sequence('loopback_result_seq'), primary_key=True)
+    id = Column(String(50))
+    request_message = Column(String(4000))
+    loopback_message = Column(String(4000))
+    real_message = Column(String(4000))
+    process_status = Column(String(10))
+    
+    def __init__(self, id, request_message, loopback_message):
+        self.id = id
+        self.request_message = request_message
+        self.loopback_message = loopback_message
+
 class Loopback(Devider):
     def __init__(self, config, params=None):
         Devider.__init__(self, config)
-        self.db = Datasource(config.properties('db_address'))
         self.id = config.properties('id')
     
     @cachable
     def database(self, id):
+        self.db = Datasource()
+        
         loopback_yn = False
         loopback_message = ''
          
@@ -207,10 +226,8 @@ class Loopback(Devider):
         self.info = self.database(self.id)
         return not self.info[0]
     
-    def ifthen(self, condition, parent, params):
-        
-        return Devider.ifthen(self, condition, parent, params)
-    
     def ifnot(self, parent, params):
+        
+        self.db.add(LoopbackResult(self.id, params, self.info[1]))
         return self.info[1]
         

@@ -9,6 +9,8 @@ import threading
 
 from util.pool import ThreadPool
 
+from util.db import Datasource
+
 
 # from multiprocessing.pool import ThreadPool
 class Node(object):
@@ -68,8 +70,9 @@ class Node(object):
         for child in self.children:
             results.append(child.process(self, data))
         return self.convert(results)
-
+    
     def convert(self, results):
+        
         return results[0]
     
 
@@ -155,8 +158,15 @@ class Receiver(Node):
         return True
     
     def process_request(self, connection, data):
-        self.finish_request(connection, data)
-        self.shutdown_request(connection, data)
+        try:
+            ds = Datasource()
+            self.finish_request(connection, data)
+            self.shutdown_request(connection, data)
+            ds.commit()
+        except:
+            ds.rollback()
+            self.handle_error(connection, data)
+            self.shutdown_request(connection)
     
     def finish_request(self, connection, data):
         self.handle(connection, data, self)
@@ -189,9 +199,13 @@ class ThreadingMixIn:
     
     def process_request_thread(self, request, client_address):
         try:
+            ds = Datasource()
             self.finish_request(request, client_address)
             self.shutdown_request(request)
+            
+            ds.commit()
         except:
+            ds.rollback()
             self.handle_error(request, client_address)
             self.shutdown_request(request)
 
