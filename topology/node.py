@@ -4,12 +4,11 @@ Created on 2016. 1. 13.
 @author: beatific J
 '''
 
-from Queue import Queue
 from SocketServer import TCPServer
 import threading
-import time
 
 from sqlalchemy import Column, String, Integer
+from sqlalchemy import Sequence
 from sqlalchemy.ext.declarative import declarative_base
 from util.queue import QueueManager
 from util.tcp import Socket
@@ -18,48 +17,21 @@ from base import Devider
 from base import Receiver
 from base import Sender
 from base import ThreadingMixIn
-from util.db import Datasource
 from util.cache import cachable
+from util.db import Datasource
+from util.speed import SpeedChecker, speed_test
 
 
-lock = threading.Lock()
-
-def speed_test(func):
-    def wrapper(*args, **kwargs):
-        
-        self = args[0]
-        
-        with lock:       
-            arg = self.q.get()
-            print 'count %s' % arg['count']
-            if arg['count'] == 0: 
-                arg['t1'] = time.time()
-            arg['count'] = arg['count'] + 1 
-            self.q.put(arg)
-
-        results = func(*args, **kwargs)
-        
-        with lock:
-            arg = self.q.get()
-            if arg['count'] % 1000 == 0: 
-                arg['t2'] = time.time()
-                print '====================================== %0.3f tps======================================' % (arg['count'] / (arg['t2']-arg['t1']))
-            self.q.put(arg)
-            
-        return results
-    return wrapper
-    
-class QueueReceiver(Receiver):
+class QueueReceiver(Receiver, SpeedChecker):
     
     daemon_threads = False
 
     def __init__(self, config, params=None):
+        SpeedChecker.__init__(self)
         Receiver.__init__(self, config, params)
         self.request_queue_name = config.config('request_queue')
         self.response_queue_name = config.config('response_queue')
         self.queue_address = config.config('queue_address')
-        self.q = Queue() #using speed_test
-        self.q.put({'count':0, 't1':None, 't2':None}) #using speed_test
         self.start()
         
     def get_connection(self):
@@ -84,19 +56,18 @@ class QueueReceiver(Receiver):
     def receive(self, key):
         return self.local.message
         
-class TCPReceiver(TCPServer, Receiver):
+class TCPReceiver(TCPServer, Receiver, SpeedChecker):
     
     daemon_threads = False
     
     def __init__(self, config, params=None):
         
+        SpeedChecker.__init__(self)
         Receiver.__init__(self, config, params)
         TCPServer.__init__(self, (config.config('ip'), int(config.config('port'))), self.handle, bind_and_activate=False)
         self.request_queue_size =int(config.config('threads'))
         self.server_bind()
         self.server_activate()
-        self.q = Queue() #using speed_test
-        self.q.put({'count':0, 't1':None, 't2':None}) #using speed_test
         self.start()
         
     @speed_test
@@ -183,7 +154,6 @@ class LoopbackInfo(Base):
     loopback_yn = Column(String(1))
     loopback_message = Column(String(4000))
 
-from sqlalchemy import Sequence
 
 class LoopbackResult(Base):
     __tablename__ = 'TB_LOOPBACK_RESULT'

@@ -11,8 +11,6 @@ from util.pool import ThreadPool
 
 from util.db import Datasource
 
-
-# from multiprocessing.pool import ThreadPool
 class Node(object):
     
     def __init__(self, type, config=None):
