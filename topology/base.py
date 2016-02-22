@@ -3,7 +3,6 @@ Created on 2016. 1. 22.
 
 @author: beatific J
 '''
-from Queue import Queue
 from abc import abstractmethod
 import threading
 
@@ -111,9 +110,6 @@ class Receiver(Node):
         self._is_shut_down = threading.Event()
         self._shutdown_request = False
         
-        self.q = Queue() #using spped_test
-        self.q.put({'count':0, 't1':None, 't2':None}) #using speed_test 
-    
     def inner_process(self, parent, params):
         return self.receive(params)
     
@@ -159,7 +155,7 @@ class Receiver(Node):
         try:
             ds = Datasource()
             self.finish_request(connection, data)
-            self.shutdown_request(connection, data)
+            self.shutdown_request(connection)
             ds.commit()
         except:
             ds.rollback()
@@ -209,7 +205,7 @@ class ThreadingMixIn:
 
     def process_request(self, request, client_address):
         self.pool.apply_async(func=self.process_request_thread, args=(request, client_address))
-    
+
 class Sender(Node):
 
     def __init__(self, config, params=None):

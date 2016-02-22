@@ -24,7 +24,7 @@ class Topology(object):
     @staticmethod
     def start(config):
         
-        TopologyBuilder.build(config)
+        return TopologyBuilder.build(config)
         
     def progress(self):
         

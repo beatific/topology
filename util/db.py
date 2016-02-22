@@ -28,7 +28,10 @@ class Datasource:
     def add_all(self, objs):
         self.session.add_all(objs)
         
-    def query(self, param):
+    def query(self, param=None):
+        if param == None:
+            return self.session.query()
+        
         return self.session.query(param)
     
     def dirty(self):

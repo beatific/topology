@@ -21,7 +21,6 @@ from util.cache import cachable
 from util.db import Datasource
 from util.speed import SpeedChecker, speed_test
 
-
 class QueueReceiver(Receiver, SpeedChecker):
     
     daemon_threads = False
@@ -55,7 +54,7 @@ class QueueReceiver(Receiver, SpeedChecker):
         
     def receive(self, key):
         return self.local.message
-        
+    
 class TCPReceiver(TCPServer, Receiver, SpeedChecker):
     
     daemon_threads = False
@@ -176,12 +175,12 @@ class Loopback(Devider):
     
     @cachable
     def database(self, id):
-        self.db = Datasource()
+        self.ds = Datasource()
         
         loopback_yn = False
         loopback_message = ''
          
-        for  info in self.db.query(LoopbackInfo).filter("id='%s'" % id):
+        for  info in self.ds.query(LoopbackInfo).filter("id='%s'" % id):
             if info.loopback_yn == 'Y':
                 loopback_yn = True
             else :
@@ -198,6 +197,42 @@ class Loopback(Devider):
     
     def ifnot(self, parent, params):
         
-        self.db.add(LoopbackResult(self.id, params, self.info[1]))
+        self.ds.add(LoopbackResult(self.id, params, self.info[1]))
         return self.info[1]
+
+class LoopbackReceiver(Receiver):
+    
+    daemon_threads = False
+
+    def __init__(self, config, params=None):
+        Receiver.__init__(self, config, params)
+        self.data = []
+        self.id = config.properties('id')
         
+        ds = Datasource()
+        for result in  ds.query(LoopbackResult).filter("id='%s'"%self.id).filter("process_status='N'"):
+            self.data.append(result)
+            
+        self.start()
+        
+    def get_connection(self):
+        
+        result = self.data.pop()
+        
+        if not self.data: 
+            self._shutdown_request = True
+            
+        return result.seq, result
+    
+    def handle(self, seq, result, server):
+        
+        self.local.message = result.request_message
+        response = self.process()
+        
+        ds = Datasource()
+        ds.query(LoopbackResult).\
+        filter(LoopbackResult.seq == result.seq).\
+        update({"real_message": response, "process_status" : "Y"})
+        
+    def receive(self, key):
+        return self.local.message
