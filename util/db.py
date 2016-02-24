@@ -8,8 +8,27 @@ from Queue import Queue
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy import Column, String, Integer
+from sqlalchemy import Sequence
+from sqlalchemy.ext.declarative import declarative_base
 
+Base = declarative_base()
 
+class LoopbackResult(Base):
+    __tablename__ = 'TB_LOOPBACK_RESULT'
+    seq = Column(Integer, Sequence('loopback_result_seq'), primary_key=True)
+    id = Column(String(50))
+    request_message = Column(String(4000))
+    loopback_message = Column(String(4000))
+    real_message = Column(String(4000))
+    process_status = Column(String(1))
+    
+    def __init__(self, id, request_message, loopback_message):
+        self.id = id
+        self.request_message = request_message
+        self.loopback_message = loopback_message
+        self.process_status = 'N'
+        
 Session = scoped_session(sessionmaker())
 
 class Datasource:
@@ -60,9 +79,15 @@ def main():
     q = Queue()
     
     ds1 = Datasource()
+    
+#     print ds1.session == ds2.session
+    
+    ds1.add(LoopbackResult('eigw001', 'request', 'response'))
+    
     ds2 = Datasource()
     
-    print ds1.session == ds2.session
+    print ds1.new()
+    print ds2.new()
     
     import threading
     

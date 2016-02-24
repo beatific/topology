@@ -6,11 +6,15 @@ Created on 2016. 1. 11.
 
 class ExceptionHandler(object):
 
-    def __init__(self, params=None):
-        '''
-        Constructor
-        '''
-        
     def handle(self, ex):
-        raise ex
-        
+        pass
+
+class DefaultExceptionHandler(ExceptionHandler):
+    
+    def handle(self, ex):
+            
+        print '-'*40
+#         print ex
+        import traceback
+        traceback.print_exc()
+        print '-'*40

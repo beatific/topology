@@ -6,13 +6,15 @@ Created on 2016. 1. 22.
 from abc import abstractmethod
 import threading
 
+from exception import DefaultExceptionHandler
 from util.pool import ThreadPool
 
 from util.db import Datasource
 
+
 class Node(object):
     
-    def __init__(self, type, config=None):
+    def __init__(self, type, config=None, handler=DefaultExceptionHandler()):
         
         self.root = False
         self.parents = []
@@ -20,6 +22,7 @@ class Node(object):
         self.type = type
         self.local = threading.local()
         self.config = config
+        self.exception_handler = handler
         
     def add_child(self, child):
         if child is None : 
@@ -63,10 +66,13 @@ class Node(object):
     def process(self, parent=None, params=None):
         
         results = []
-        data = self.inner_process(parent, params)
-        for child in self.children:
-            results.append(child.process(self, data))
-        return self.convert(results)
+        try:
+            data = self.inner_process(parent, params)
+            for child in self.children:
+                results.append(child.process(self, data))
+            return self.convert(results)
+        except Exception as ex:
+            self.exception_handler.handle(ex)
     
     def convert(self, results):
         
@@ -114,15 +120,20 @@ class Receiver(Node):
         return self.receive(params)
     
     def start(self):
-        t = threading.Thread(target = self.serve_forever, args = ())
-        t.daemon = self.daemon_threads
-        t.start()
+        try :
+            t = threading.Thread(target = self.serve_forever, args = ())
+            t.daemon = self.daemon_threads
+            t.start()
+        except Exception as ex:
+            self.exception_handler.handle(ex)
         
     def serve_forever(self):
         self._is_shut_down.clear()
         try:
             while not self._shutdown_request:
                 self._handle_request_noblock()
+        except Exception as ex:
+            self.exception_handler.handle(ex)
         finally:
             self._shutdown_request = False
             self._is_shut_down.set()
@@ -133,17 +144,10 @@ class Receiver(Node):
         if self.verify_request(connection, data):
             try:
                 self.process_request(connection, data)
-            except:
-                self.handle_error(connection, data)
+            except Exception as ex:
+                self.exception_handler.handle(ex)
                 self.shutdown_request(connection)
 
-    def handle_error(self, connection, data):
-        print '-'*40
-        print 'Exception happened during processing of request',
-        import traceback
-        traceback.print_exc()
-        print '-'*40
-        
     def shutdown(self):
         self._shutdown_request = True
         self._is_shut_down.wait()
@@ -157,9 +161,9 @@ class Receiver(Node):
             self.finish_request(connection, data)
             self.shutdown_request(connection)
             ds.commit()
-        except:
+        except Exception as ex:
             ds.rollback()
-            self.handle_error(connection, data)
+            self.exception_handler.handle(ex)
             self.shutdown_request(connection)
     
     def finish_request(self, connection, data):
@@ -196,11 +200,10 @@ class ThreadingMixIn:
             ds = Datasource()
             self.finish_request(request, client_address)
             self.shutdown_request(request)
-            
             ds.commit()
-        except:
+        except Exception as ex:
             ds.rollback()
-            self.handle_error(request, client_address)
+            self.exception_handler.handle(ex)
             self.shutdown_request(request)
 
     def process_request(self, request, client_address):

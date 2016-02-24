@@ -16,6 +16,8 @@ py_modules = [
  'util.config',
  'util.argument',
  'util.db',
+ 'util.cache',
+ 'util.speed',
 ]
 print 'Topology-Agent modules\n%s' % py_modules
 setup (name = 'Topology',

@@ -38,12 +38,13 @@ class QueueReceiver(Receiver, SpeedChecker):
 #         return self.queue(), data
         return (None, None)
     
-    @speed_test
+#     @speed_test
     def handle(self, queue, data, server):
         
         queue = QueueManager(self.queue_address)
         queue.connect()
         data = queue.get(self.request_queue_name)
+        print 'message get{%s}' % data
         self.local.message = data
         
         response = self.process()
@@ -77,6 +78,9 @@ class TCPReceiver(TCPServer, Receiver, SpeedChecker):
         response = self.process()
         
         request.sendall(response)
+        
+    def handle_error(self, request, client_address):
+        self.exception_handler.handle('Exception happened during processing of request from %s' % client_address)
     
     def start(self):
         t = threading.Thread(target = self.serve_forever, args = ())
@@ -145,6 +149,27 @@ class TCPSender(Sender):
 
 Base = declarative_base()
 
+class TCPConnectionSender(Sender):
+
+    def __init__(self, config, params=None):
+        Sender.__init__(self, config, params)
+        self.ip = config.config('ip')
+        self.port = int(config.config('port'))
+        self.sock = Socket(self.ip, self.port)
+        self.sock.connect()
+    
+    def send(self, message):
+        
+        self.sock.send(message)
+        data = self.sock.receive()
+        
+        return data
+    
+    def inner_shutdown(self):
+        self.sock.close()
+
+Base = declarative_base()
+
 
 class LoopbackInfo(Base):
     __tablename__ = 'TB_LOOPBACK'
@@ -161,12 +186,13 @@ class LoopbackResult(Base):
     request_message = Column(String(4000))
     loopback_message = Column(String(4000))
     real_message = Column(String(4000))
-    process_status = Column(String(10))
+    process_status = Column(String(1))
     
     def __init__(self, id, request_message, loopback_message):
         self.id = id
         self.request_message = request_message
         self.loopback_message = loopback_message
+        self.process_status = 'N'
 
 class Loopback(Devider):
     def __init__(self, config, params=None):
@@ -175,12 +201,12 @@ class Loopback(Devider):
     
     @cachable
     def database(self, id):
-        self.ds = Datasource()
+        ds = Datasource()
         
         loopback_yn = False
         loopback_message = ''
          
-        for  info in self.ds.query(LoopbackInfo).filter("id='%s'" % id):
+        for  info in ds.query(LoopbackInfo).filter("id='%s'" % id):
             if info.loopback_yn == 'Y':
                 loopback_yn = True
             else :
@@ -196,8 +222,8 @@ class Loopback(Devider):
         return not self.info[0]
     
     def ifnot(self, parent, params):
-        
-        self.ds.add(LoopbackResult(self.id, params, self.info[1]))
+        ds = Datasource()
+        ds.add(LoopbackResult(self.id, params, self.info[1]))
         return self.info[1]
 
 class LoopbackReceiver(Receiver):

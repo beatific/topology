@@ -1,36 +1,7 @@
 from Queue import Queue
 import SocketServer
-import threading
-import time
 #from guppy.heapy import RM
 
-
-lock = threading.Lock()
-
-def speed_test(func):
-    def wrapper(*args, **kwargs):
-        
-        self = args[0]
-        
-        with lock:       
-            arg = self.q.get()
-            print 'count %s' % arg['count']
-            if arg['count'] == 0: 
-                arg['t1'] = time.time()
-            arg['count'] = arg['count'] + 1 
-            self.q.put(arg)
-
-        results = func(*args, **kwargs)
-        
-        with lock:
-            arg = self.q.get()
-            if arg['count'] % 1000 == 0: 
-                arg['t2'] = time.time()
-                print '====================================== %0.3f tps======================================' % (arg['count'] / (arg['t2']-arg['t1']))
-            self.q.put(arg)
-            
-        return results
-    return wrapper
 
 class MyTCPHandler(SocketServer.BaseRequestHandler):
     """
@@ -44,12 +15,12 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
     q = Queue() #using speed_test
     q.put({'count':0, 't1':None, 't2':None}) #using speed_test
     
-#     @speed_test
     def handle(self):
         
         # self.request is the TCP socket connected to the client
         self.data = self.request.recv(1024).strip()
-#         print "{} wrote:".format(self.client_address[0])
+        print "{} wrote:".format(self.client_address[0])
+        print self.data
         # just send back the same data, but upper-cased
         
 #         print 'sleep %d' % ++self.i
